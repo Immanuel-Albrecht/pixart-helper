@@ -44,7 +44,7 @@ config["input"] = sys.argv[1]
 config["output"] = sys.argv[2] if len(sys.argv) > 2 else \
                     os.path.join(os.path.dirname(config["input"]),
                     "ega-"+os.path.basename(config["input"]))
-config["threshold"] = 80
+config["threshold"] = 120
 config["t0"] = 0
 config["t1"] = 255
 
@@ -125,7 +125,7 @@ def to_nearest_palette(img, palette = ega_palette):
         
     return img0.reshape(shape)
     
-def to_binary_alpha(img, threshold=85, t0=0,t1=255):
+def to_binary_alpha(img, threshold=120, t0=0,t1=255):
     shape = img.shape
     channels = shape[-1]
     dims = shape[:-1]
