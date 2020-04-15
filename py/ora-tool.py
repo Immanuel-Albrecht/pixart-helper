@@ -1,24 +1,77 @@
 #!/usr/bin/env python3
+# those modules should be present in any python3
 import sys
 import os
 import zipfile
+import re
+
+# non-standard python modules
 try:
     import xmltodict
     from PIL import Image, ImageSequence
     import numpy as np
+    import yaml
 except ModuleNotFoundError:
     print("One or more required packages are missing. Try running:")
-    print("   python3 -m pip install --user xmltodict Pillow numpy")
+    print("   python3 -m pip install --user xmltodict Pillow numpy pyyaml")
+    sys.exit(1)
+    
+# We support different modes of programming this tool
+
+supported_modes = ["yaml","binarize","palettize","bin-pal"]
+
+if len(sys.argv) > 1 and sys.argv[1] == "help":
+    if len(sys.argv) < 3 or not sys.argv[2] in supported_modes:
+        print(f"Usage: {sys.argv[0]} help MODE")
+        print(f" where MODE may be one of the following:\n\n {', '.join(supported_modes)}")
+    else:
+        mode = sys.argv[2]
+        if mode == "yaml":
+            print(f"Usage: {sys.argv[0]} yaml [yaml-paths]")
+            print(" where [yaml-paths] may be a sequence of paths to yaml files.")
+            print(" If the sequence of paths is empty, then the yaml is read from stdin.")
+        else:
+            print(f"Unfortunately, the help on {mode} is currently not available.")
     sys.exit(1)
 
-if not len(sys.argv) in [2,3]:
-    print(f"Usage: {sys.argv[0]} INPUT [OUTPUT]\n")
-    print("   where INPUT   is the path to an .ora (Open Raster) image")
-    print("     and OUTPUT  is the path where the palettized image shall be put to,")
-    print("                 this defaults to 'ega-$INPUT'.")
+if len(sys.argv) < 2 or not sys.argv[1] in supported_modes:
+    print(f"Usage: {sys.argv[0]} MODE [...]")
+    print(f" where MODE may be one of the following:\n  {', '.join(supported_modes)}")
+    print(f"\nYou may use {sys.argv[0]} help MODE to get more information on each mode.")
     sys.exit(1)
 
-config = {}
+todo = []
+
+def find_all_ora_tool_dicts(y):
+    found = []
+    if type(y) == dict:
+        for x in y:
+            if x == "ora-tool":
+                found.append(y[x])
+            else:
+                found.extend( find_all_ora_tool_dicts(y[x]))
+    elif type(y) == list:
+        for x in y:
+            found.extend(find_all_ora_tool_dicts(x))
+    return found
+
+if sys.argv[1] == "yaml":
+    parts = []
+    if len(sys.argv) > 2:
+        for p in sys.argv[2:]:
+            with open(p,"r",encoding="utf-8") as fy:
+                for part in yaml.load_all(fy):
+                    parts.append(part)
+    else:
+        for part in yaml.load_all(sys.stdin):
+            parts.append(part)
+    for part in parts:
+        todo.extend(find_all_ora_tool_dicts(part))
+else:
+    print("Mode {sys.argv[1]} currently not available!")
+    sys.exit(1)
+
+sys.exit(0)
 
 ega_palette = np.array([ [int(x[i*2]+x[i*2+1],base=16) for i in range(3)] for x in
                             map(lambda x: x.strip(), """000000
@@ -38,6 +91,18 @@ ega_palette = np.array([ [int(x[i*2]+x[i*2+1],base=16) for i in range(3)] for x 
                                                     FFFF55
                                                     FFFFFF""".split("\n"))])
 
+defaults = {}
+defaults["palette"] = ega_palette
+defaults["named-palettes"] = {'ega': ega_palette}
+defaults["to-nearest-palatte"] = {"file":"default",
+                                  "layers":lambda x: True,
+                                  "palette":"ega"}
+defaults["to-binary-alpha"] = {"file":"default",
+                                  "layers":lambda x: True,
+                                  "palette":"ega"}
+
+
+
 config["palette"] = ega_palette
 config["actions"] = ["to_nearest_palette","to_binary_alpha"]
 config["input"] = sys.argv[1]
@@ -48,14 +113,19 @@ config["threshold"] = 120
 config["t0"] = 0
 config["t1"] = 255
 
-todo = [config]
 
 
 def img_to_np(fp):
+    """
+        reads an image from the file handle and returns it as an numpy array
+    """
     img = Image.open(fp)
     return np.asarray(img)
 
 def load_ora(path):
+    """
+        Loads an Open Raster image; as it might have been saved by krita or pinta...
+    """
     layers = []
     with zipfile.ZipFile(path) as f:
         files = list(f.namelist())
@@ -65,6 +135,12 @@ def load_ora(path):
         layer_names_srcs = list(map(lambda x: (x['@name'],x['@src']), info['image']['stack']['layer']))
         layers = [ (lbl, img_to_np(f.open(src))) for lbl,src in layer_names_srcs]
     return layers
+    
+def load_single_layer(path):
+    """
+        Loads a single layer png :)
+    """
+    return [("layer0",img_to_np(path))]
     
 def write_ora(path,layers):
     w = max([x[1].shape[1] for x in layers] )
@@ -142,6 +218,8 @@ def to_binary_alpha(img, threshold=120, t0=0,t1=255):
             img0[i][-1] = t0 if img0[i][-1] < threshold else t1
             
     return img0.reshape(shape)
+
+
 
 def work(config):
     img = load_ora(config["input"])
