@@ -55,11 +55,21 @@ filter_string_desc = """
                             before matching.
 """
 images_description = """
-    You may provide either a single image description string, or a list of image descriptions strings.
-    If you provide a list, then an image is selected for processing if it is described by at least one
-    of the given strings.""" + filter_string_desc
-layers_description = """ """
-palette_description = """ """
+    You may provide either a single image description string, or a list of 
+    image descriptions strings. If you provide a list, then an image is 
+    selected for processing if it is described by at least one of the given 
+    strings.""" + filter_string_desc
+layers_description = """
+    You may either provide a single layer description string, a layer number,
+    or a list of layer descriptions strings and layer numbers. If you provide
+    a list, then a layer is selected for processing if it is described by at 
+    least one of the given strings or numbers.\n""" + filter_string_desc
+palette_description = """
+    You may either provide a palette as an array of 3-elementary arrays (RGB),
+    as an array of 4-elementary arrays (RGBA), or as a string refering to a
+    predefined palette. Valid predefined palettes are:
+            ega
+"""
 
 default_params["to-nearest-palette"] = {
     "images":"+@.*",
@@ -71,7 +81,8 @@ op_help["to-nearest-palette"] = """
     Each pixel in the processed layers is assigned the from the palette that 
     is closest to its original color, leaving the alpha value untouched for
     RGB palettes, and considering the alpha value part of the pixels color
-    for RGBA palettes.
+    for RGBA palettes. The distance between the original color and each
+    palette color is determined by the Euclidean norm.
 """
 
 param_help["to-nearest-palette"] = {
@@ -87,9 +98,33 @@ default_params["to-binary-alpha"] = {
     "t0":0,
     "t1":255}
     
+op_help["to-binary-alpha"] = """
+    The alpha value of each pixel in the processed layer is set to either
+    a low (t0) or high (t1) value, depending on whether it is less than the
+    given threshold.
+"""
+
+param_help["to-binary-alpha"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "threshold":"\nThreshold value for the alpha compontent.\n",
+    "t0":"\nLow alpha value for pixels with alpha below the threshold.\n",
+    "t1":"\nHigh alpha value for pixels with alpha above or equal to the threshold.\n",
+}
+
+    
 default_params["rm-layers"] = {
     "images": "+@.*",
     "layers": "~backdrop",
+}
+
+op_help["rm-layers"] = """
+    Removes the matching layers from the images in memory.
+"""
+
+param_help["rm-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
 }
 
 
@@ -449,7 +484,7 @@ def get_palette(palette):
         return named_palettes[palette]
     if type(palette) == np.ndarray:
         return palette
-    return np.array(palette, dtype="uint8")
+    return np.array(palette, dtype=np.uint8)
     
 def get_matcher_from_str(exp):
     """
