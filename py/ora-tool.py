@@ -145,19 +145,19 @@ default_params["to-binary-alpha"] = {
     "t1":255}
 
 
-
-def img_to_np(fp):
+def npa_convert_to_rgba(imga):
     """
-        reads an image from the file handle and returns it as an numpy array
+        single point of conversion for the different pixel formats ...
+        it's a hack, though.
     """
-    img = Image.open(fp)
-    imga = np.asarray(img)
     # the following is an odd bid to cope with non RGBA images...
     if imga.dtype != np.uint8:
         imga = imga
         imga = imga / imga.max() #normalizes data in range 0 - 255
         imga = 255 * imga
         imga = imga.astype(np.uint8)
+    if len(imga.shape) == 3 and imga.shape[-1] == 1:
+        imga = imga.reshape(imga.shape[:-1])
     if len(imga.shape) == 2: # greyscale image
         alpha = np.ones(imga.shape,dtype='uint8')*255
         imga = np.stack([imga,imga,imga,alpha],axis=-1)
@@ -165,6 +165,14 @@ def img_to_np(fp):
         alpha = np.ones(imga.shape[:-1]+(1,),dtype='uint8')*255
         imga = np.concatenate([imga,alpha],axis=-1)
     return imga
+
+def img_to_np(fp):
+    """
+        reads an image from the file handle and returns it as an numpy array
+    """
+    img = Image.open(fp)
+    imga = np.asarray(img)
+    return npa_convert_to_rgba(imga)
 
 def load_ora(path):
     """
@@ -215,6 +223,13 @@ def write_ora(path,layers):
                 pimg.save(pf,"PNG")
                 pf.close()
             l0 -= 1
+        # add a merged image
+        merged_img = merge_layers([img for lbl,img in layers])
+        lpath = f"mergedimage.png"
+        pimg = Image.fromarray(merged_img)
+        with f.open(lpath,"w") as pf:
+            pimg.save(pf,"PNG")
+            pf.close()
         f.close()
 
     
@@ -326,6 +341,22 @@ def get_image_filter_map(filter_exp):
     if type(filter_exp) == str:
         q = re.compile(filter_exp)
         return lambda x,q=q: q.match(x)
+        
+def merge_layers(layers):
+    """
+        merges a list of pixel arrays and returns the result as
+        RGBA array
+    """
+    layers = [x if len(x.shape) == 3 and x.shape[-1] == 4 else npa_convert_to_rgba(x) for x in layers ] 
+    w = max(map(lambda x: x.shape[1], layers))
+    h = max(map(lambda x: x.shape[0], layers))
+    output = np.zeros((h,w,4),dtype=np.float)
+    for l in layers:
+        h,w = l.shape[:2]
+        opaqueness = output[0:h,0:w,-1].reshape((h,w,1))
+        see_through_left = 255 - opaqueness
+        output[0:h,0:w,:] = (opaqueness * output[0:h,0:w,:] + see_through_left * l[0:h,0:w,:]) / 255
+    return (output + .5).astype(np.uint8)
 
 def get_layer_filter_map(filter_exp):
     if type(filter_exp) == type(lambda:0):
