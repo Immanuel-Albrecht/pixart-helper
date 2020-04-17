@@ -2,3 +2,4 @@ numpy
 Pillow
 xmltodict
 pyyaml
+scikit-image

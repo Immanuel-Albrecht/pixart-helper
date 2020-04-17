@@ -4,6 +4,7 @@ import sys
 import os
 import zipfile
 import re
+from skimage import transform as sit
 
 # non-standard python modules
 try:
@@ -18,10 +19,31 @@ except ModuleNotFoundError:
     
 # We support different modes of programming this tool
 
-supported_modes = ["yaml","binarize","palettize","bin-pal"]
+supported_modes = ["yaml","binarize","palettize","pal-bin"]
+
+default_params = {}
+
+default_params["to-nearest-palette"] = {
+    "images":"+@.*",
+    "layers":"+@.*",
+    "palette":"ega",
+    }
+    
+default_params["to-binary-alpha"] = {   
+    "images":"+@.*",
+    "layers":"+@.*",
+    "threshold":120,
+    "t0":0,
+    "t1":255}
+    
+default_params["rm-layers"] = {
+    "images": "+@.*",
+    "layers": "~backdrop",
+}
+
 
 if len(sys.argv) > 1 and sys.argv[1] == "help":
-    if len(sys.argv) < 3 or not sys.argv[2] in supported_modes:
+    if len(sys.argv) < 3 or not sys.argv[2] in supported_modes+["ops","op"]:
         print(f"Usage: {sys.argv[0]} help MODE")
         print(f" where MODE may be one of the following:\n\n {', '.join(supported_modes)}")
     else:
@@ -37,7 +59,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "help":
 if len(sys.argv) < 2 or not sys.argv[1] in supported_modes:
     print(f"Usage: {sys.argv[0]} MODE [...]")
     print(f" where MODE may be one of the following:\n  {', '.join(supported_modes)}")
-    print(f"\nYou may use {sys.argv[0]} help MODE to get more information on each mode.")
+    print(f"\nYou may use   {sys.argv[0]} help MODE   to get more information on each mode.")
+    print(f"\nYou may use   {sys.argv[0]} help ops    to get more information on available operations.")
     sys.exit(1)
 
 todo = []
@@ -91,7 +114,7 @@ elif sys.argv[1] == "binarize":
     todo = [{'input': inpath,
              'output': outpath,
              'ops':'to-binary-alpha'}]
-elif sys.argv[1] == "binarize":
+elif sys.argv[1] == "pal-bin":
     if len( sys.argv ) < 3:
         print(f"To find out about the usage, call {sys.argv[0]} help {sys.argv[1]}.")
         sys.exit(1)
@@ -102,7 +125,7 @@ elif sys.argv[1] == "binarize":
         outpath = os.path.join(os.path.dirname(inpath),"ega-a-"+os.path.basename(inpath))
     todo = [{'input': inpath,
              'output': outpath,
-             'ops':['to-nearest-palette','to-binary-alpha']}]
+             'ops':['to-nearest-palette','to-binary-alpha','rm-layers']}]
 else:
     print("Mode {sys.argv[1]} currently not available!")
     sys.exit(1)
@@ -127,22 +150,6 @@ ega_palette = np.array([ [int(x[i*2]+x[i*2+1],base=16) for i in range(3)] for x 
 
 named_palettes = {'ega': ega_palette}
 
-use_all = lambda x,y=0: True
-
-default_params = {}
-
-default_params["to-nearest-palette"] = {
-    "images":use_all,
-    "layers":use_all,
-    "palette":"ega",
-    }
-    
-default_params["to-binary-alpha"] = {   
-    "images":use_all,
-    "layers":use_all,
-    "threshold":120,
-    "t0":0,
-    "t1":255}
 
 
 def npa_convert_to_rgba(imga):
@@ -209,12 +216,6 @@ def write_ora(path,layers):
     with zipfile.ZipFile(path,"w",compression=zipfile.ZIP_DEFLATED) as f:
         f.writestr("mimetype","image/openraster")
         f.writestr("stack.xml",stackxml)
-        # We have to put a fake thumbnail into the .ora file so that we do not get errors when selecting the
-        # file in Pinta's open-menu ...
-        with f.open("Thumbnails/thumbnail.png","w") as pf:
-            thimg = Image.fromarray(np.zeros((1,1,4),dtype='uint8'))
-            thimg.save(pf,"PNG")
-            pf.close()
         l0 = L0
         for _, img in layers:
             lpath = f"data/layer{l0}.png"
@@ -229,6 +230,18 @@ def write_ora(path,layers):
         pimg = Image.fromarray(merged_img)
         with f.open(lpath,"w") as pf:
             pimg.save(pf,"PNG")
+            pf.close()
+        if w > h:
+            tw = 32
+            th = int(h*tw/w+.5)
+        else:
+            th = 32
+            tw = int(w*th/h+.5)
+        # and even a real thumbnail so Pinta's file open menu works now
+        thumb_img = (sit.resize(merged_img/255.,(th,tw,4),mode='reflect',order=1,anti_aliasing=True)*255).astype(np.uint8)
+        with f.open("Thumbnails/thumbnail.png","w") as pf:
+            thimg = Image.fromarray(thumb_img)
+            thimg.save(pf,"PNG")
             pf.close()
         f.close()
 
@@ -292,7 +305,9 @@ def transform_input_output_to_dict(x):
     return {'default':x}
     
 
-oplist = ["to-nearest-palette","to-binary-alpha"]
+oplist = ["to-nearest-palette",
+          "to-binary-alpha",
+          "rm-layers"]
     
 def transform_ops(x):
     if type(x) != list:
@@ -332,6 +347,41 @@ def get_palette(palette):
         return palette
     return np.array(palette, dtype="uint8")
     
+def get_matcher_from_str(exp):
+    """
+        returns a function that takes a string and returns whether it matches or not.
+        
+        A string may start with '+' or '-' or '!' indicating whether to filter strings that
+        match vs strings that do not match ('+' uses images/layers that match, '-' or '!' uses images/layers that
+        do not match).
+        After '+','-', or '!', there may be a qualifier '=' for exact string matches, 
+                                                        '~' for lowercase string matches,
+                                                none or '@' for regexp matches (a.k.a. default), and
+                                                        '/' for regexp-matching the lowercase of the layer/image name.
+    """
+    positive = True
+    if exp.startswith("+") or exp.startswith("-") or exp.startswith("!"):
+        positive = exp[0] == "+"
+        exp = exp[1:]
+    if exp.startswith("="):
+        exp = exp[1:]
+        return lambda t,x=exp,p=positive: (t==x) == p
+    if exp.startswith("~"):
+        exp = exp[1:]
+        return lambda t,x=exp.lower(),p=positive: (str(t).lower()==x) == p
+    if exp.startswith("/"):
+        exp = exp[1:]
+        convert = lambda x: str(x).lower()
+    else:
+        convert = str
+        if exp.startswith("@"):
+            exp = exp[1:]
+    q = re.compile(exp)
+    if positive:
+        return lambda t,q=q,c=convert: q.match(c(t))
+    else:
+        return lambda t,q=q,c=convert: not q.match(c(t))
+    
 def get_image_filter_map(filter_exp):
     if type(filter_exp) == type(lambda:0):
         return filter_exp
@@ -339,8 +389,7 @@ def get_image_filter_map(filter_exp):
         q = [get_image_filter_map(x) for x in filter_exp]
         return lambda x,q=q: any([f(x) for f in q])
     if type(filter_exp) == str:
-        q = re.compile(filter_exp)
-        return lambda x,q=q: q.match(x)
+        return get_matcher_from_str(filter_exp)
         
 def merge_layers(layers):
     """
@@ -357,6 +406,8 @@ def merge_layers(layers):
         see_through_left = 255 - opaqueness
         output[0:h,0:w,:] = (opaqueness * output[0:h,0:w,:] + see_through_left * l[0:h,0:w,:]) / 255
     return (output + .5).astype(np.uint8)
+    
+
 
 def get_layer_filter_map(filter_exp):
     if type(filter_exp) == type(lambda:0):
@@ -365,8 +416,8 @@ def get_layer_filter_map(filter_exp):
         q = [get_layer_filter_map(x) for x in filter_exp]
         return lambda x,y,q=q: any([f(x,y) for f in q])
     if type(filter_exp) == str:
-        q = re.compile(filter_exp)
-        return lambda x,y,q=q: q.match(y)
+        q = get_matcher_from_str(filter_exp)
+        return lambda x,y,q=q: q(y)
     if type(filter_exp) == int:
         return lambda x,y,q=filter_exp: x == q
 
@@ -377,7 +428,7 @@ def get_image_layers(data, images, layers):
     for k in data:
         if img_filter(k):
             for nbr,l in enumerate(data[k]):
-                name, img = l
+                name, _ = l
                 if layer_filter(len(data[k])-nbr-1,name):
                     img_layer.append((k, nbr))
     return img_layer
@@ -387,6 +438,7 @@ def work(task):
     i = transform_input_output_to_dict(task["input"])
     o = transform_input_output_to_dict(task["output"])
     for k in i:
+        print(f"LOAD: '{i[k]}' as image '{k}'.")
         data[k] = load_ora(i[k])
         
     for op, params in transform_ops(task["ops"]):
@@ -397,6 +449,7 @@ def work(task):
             p = get_palette(params["palette"])
             for k,idx in get_image_layers(data,params["images"],params["layers"]):
                 lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 img = to_nearest_palette(img, palette=p)
                 data[k][idx] = (lbl, img)
         elif op == 'to-binary-alpha':
@@ -405,10 +458,16 @@ def work(task):
             t1 = int(params["t1"])
             for k,idx in get_image_layers(data,params["images"],params["layers"]):
                 lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 img = to_binary_alpha(img,thr,t0,t1)
                 data[k][idx] = (lbl, img)
-            
+        elif op == "rm-layers":
+            remove_layers = get_image_layers(data,params["images"],params["layers"])
+            for k,idx in sorted(set(remove_layers),key=lambda x: (x[0],-x[1])):
+                print(f"    ..dropping layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                data[k] = data[k][:idx] + data[k][idx+1:]
     for k in o:
+        print(f"STORE: image '{k}' to '{o[k]}'.")
         write_ora(o[k],data[k])
 
 for task in todo:
