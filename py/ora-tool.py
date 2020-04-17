@@ -75,6 +75,7 @@ default_params["to-nearest-palette"] = {
     "images":"+@.*",
     "layers":"+@.*",
     "palette":"ega",
+    "divisor":255
     }
 
 op_help["to-nearest-palette"] = """
@@ -82,13 +83,15 @@ op_help["to-nearest-palette"] = """
     is closest to its original color, leaving the alpha value untouched for
     RGB palettes, and considering the alpha value part of the pixels color
     for RGBA palettes. The distance between the original color and each
-    palette color is determined by the Euclidean norm.
+    palette color is determined by the Euclidean norm of the channel
+    differences divided by the divisor.
 """
 
 param_help["to-nearest-palette"] = {
     "images":images_description,
     "layers":layers_description,
-    "palette":palette_description
+    "palette":palette_description,
+    "divisor":"\nThe difference between each original color channel and each\npalette color channel is divided by this value.\n"
 }
     
 default_params["to-binary-alpha"] = {   
@@ -388,7 +391,7 @@ def write_ora(path,layers):
         f.close()
 
     
-def to_nearest_palette(img, palette = ega_palette):
+def to_nearest_palette(img, palette = ega_palette, divisor=255):
     shape = img.shape
     channels = shape[-1]
     dims = shape[:-1]
@@ -405,7 +408,7 @@ def to_nearest_palette(img, palette = ega_palette):
             x = img0[i][:-1]
         else:
             x = img0[i]
-        distances = [np.sqrt(np.sum((x - p)**2)) for p in palette]
+        distances = [np.sqrt(np.sum(((x - p)/divisor)**2)) for p in palette]
         d0 = min(distances)
         x = palette[distances.index(d0)]
         if has_alpha:
@@ -480,8 +483,8 @@ def transform_ops(x):
     return ops
 
 def get_palette(palette):
-    if palette in named_palettes:
-        return named_palettes[palette]
+    if str(palette) in named_palettes:
+        return named_palettes[str(palette)]
     if type(palette) == np.ndarray:
         return palette
     return np.array(palette, dtype=np.uint8)
@@ -589,7 +592,7 @@ def work(task):
             for k,idx in get_image_layers(data,params["images"],params["layers"]):
                 lbl,img = data[k][idx]
                 print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
-                img = to_nearest_palette(img, palette=p)
+                img = to_nearest_palette(img, palette=p,divisor=float(params["divisor"]))
                 data[k][idx] = (lbl, img)
         elif op == 'to-binary-alpha':
             thr = int(params["threshold"])
