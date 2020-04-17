@@ -21,13 +21,64 @@ except ModuleNotFoundError:
 
 supported_modes = ["yaml","binarize","palettize","pal-bin"]
 
+
+oplist = sorted(["to-nearest-palette",
+          "to-binary-alpha",
+          "rm-layers",
+          ])
+
 default_params = {}
+param_help = {}
+op_help = {}
+
+filter_string_desc = """
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+"""
+images_description = """
+    You may provide either a single image description string, or a list of image descriptions strings.
+    If you provide a list, then an image is selected for processing if it is described by at least one
+    of the given strings.""" + filter_string_desc
+layers_description = """ """
+palette_description = """ """
 
 default_params["to-nearest-palette"] = {
     "images":"+@.*",
     "layers":"+@.*",
     "palette":"ega",
     }
+
+op_help["to-nearest-palette"] = """
+    Each pixel in the processed layers is assigned the from the palette that 
+    is closest to its original color, leaving the alpha value untouched for
+    RGB palettes, and considering the alpha value part of the pixels color
+    for RGBA palettes.
+"""
+
+param_help["to-nearest-palette"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "palette":palette_description
+}
     
 default_params["to-binary-alpha"] = {   
     "images":"+@.*",
@@ -42,19 +93,75 @@ default_params["rm-layers"] = {
 }
 
 
+
 if len(sys.argv) > 1 and sys.argv[1] == "help":
-    if len(sys.argv) < 3 or not sys.argv[2] in supported_modes+["ops","op"]:
+    if len(sys.argv) < 3 or not sys.argv[2] in supported_modes+["ops","op","parameter"]:
         print(f"Usage: {sys.argv[0]} help MODE")
         print(f" where MODE may be one of the following:\n\n {', '.join(supported_modes)}")
     else:
         mode = sys.argv[2]
-        if mode == "yaml":
+        if mode == "ops":
+            print("The following operations are supported:\n   "+'\n   '.join(oplist))
+            print("You may obtain further information on these operations with")
+            print(f"   {sys.argv[0]} help op [item-from-the-list-above]")
+        elif mode == "op":
+            if len(sys.argv) < 4 or not sys.argv[3] in oplist:
+                print(f"Usage: {sys.argv[0]} help op [op-name]")
+                print("  where [op-name] is one of the following:")
+                print("        "+"\n        ".join(oplist))
+            else:
+                opname = sys.argv[3]
+                print(f"{opname}\n{'='*len(opname)}\n{op_help[opname]}")
+                print(f"Example yaml of call with default parameters:\n")
+                opmap = {'ora-tool':{'input':{'default':'/path/to/input.ora'},
+                                     'output':{'default':'/path/to/output.ora'},
+                                     'ops':[{opname:default_params[opname]}]}}
+                print(yaml.dump(opmap,default_flow_style = False, allow_unicode = True))
+                print(f"\nIn order to get help on each parameter, use\n   {sys.argv[0]} help parameter {opname} [parameter]\n")
+                print(f"  where [parameter] is one of the following:")
+                print( "        " + "\n        ".join(sorted(param_help[opname].keys())))
+        elif mode == "parameter":
+                if len(sys.argv) < 4 or not sys.argv[3] in oplist:
+                    print(f"Usage: {sys.argv[0]} help parameter [op-name] [parameter]")
+                    print("  where [op-name] is one of the following:")
+                    print("        "+"\n        ".join(oplist))
+                elif len(sys.argv) < 5 or not sys.argv[4] in param_help[sys.argv[3]]:
+                    print(f"Usage: {sys.argv[0]} help parameter {sys.argv[3]} [parameter]")
+                    print("  where [parameter] is one of the following:")
+                    print("        "+"\n        ".join(sorted(param_help[sys.argv[3]].keys())))
+                else:
+                    print(f"Parameter {sys.argv[4]} of {sys.argv[3]}")
+                    print("="*(len("Parameter  of ")+len(sys.argv[3])+len(sys.argv[4])))
+                    print(param_help[sys.argv[3]][sys.argv[4]])
+                    print("default: ")
+                    print("     "+yaml.dump({sys.argv[4]:default_params[sys.argv[3]][sys.argv[4]]},default_flow_style = False, allow_unicode = True).replace("\n","\n     "))
+
+        elif mode == "yaml":
             print(f"Usage: {sys.argv[0]} yaml [yaml-paths]")
             print(" where [yaml-paths] may be a sequence of paths to yaml files.")
             print(" If the sequence of paths is empty, then the yaml is read from stdin.")
+            print("")
+            print("Each yaml document is traversed for dictionaries that have a key named")
+            print("'ora-tool'. The contents of these keys are supposed to be maps that")
+            print("describe what the tool should do. Each such map should define the following")
+            print("three keys: 'input', 'output', and 'ops'.\n")
+            print("'input' and 'output' may either be a single string, a map, or a list of")
+            print("strings, which determines which OpenRaster files to load the internal named")
+            print("images from or store the internal named images to, before and after processing,")
+            print("respectively. A map maps the internal image name to the file paths, whereas a")
+            print("single string is considered to map the internal name 'default'. A list of")
+            print("strings is considered to map the internal names 'default', 'default1',")
+            print("'default2', and so on.\n")
+            print("The 'ops' key defines which operations shall be carried out on the loaded")
+            print("images. It may consist of a single operation or a list of operations, and")
+            print("each operation may be either given as a string -- thus using all default")
+            print("parameters -- or as a map where the key is the name of the operation which")
+            print("maps to a map of parameters that override the operations defaults.")
+            print(f"You may use \n    {sys.argv[0]} help ops \nin order to obtain a list of supported operations.")
+            
         else:
             print(f"Unfortunately, the help on {mode} is currently not available.")
-    sys.exit(1)
+    sys.exit(0)
 
 if len(sys.argv) < 2 or not sys.argv[1] in supported_modes:
     print(f"Usage: {sys.argv[0]} MODE [...]")
@@ -305,9 +412,6 @@ def transform_input_output_to_dict(x):
     return {'default':x}
     
 
-oplist = ["to-nearest-palette",
-          "to-binary-alpha",
-          "rm-layers"]
     
 def transform_ops(x):
     if type(x) != list:
