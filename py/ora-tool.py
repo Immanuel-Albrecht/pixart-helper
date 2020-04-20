@@ -25,6 +25,7 @@ supported_modes = ["yaml","binarize","palettize","pal-bin"]
 oplist = sorted(["to-nearest-palette",
           "to-binary-alpha",
           "rm-layers",
+          "cp-layers",
           ])
 
 default_params = {}
@@ -71,6 +72,8 @@ palette_description = """
             ega
 """
 
+# to-nearest-palette
+
 default_params["to-nearest-palette"] = {
     "images":"+@.*",
     "layers":"+@.*",
@@ -93,7 +96,9 @@ param_help["to-nearest-palette"] = {
     "palette":palette_description,
     "divisor":"\nThe difference between each original color channel and each\npalette color channel is divided by this value.\n"
 }
-    
+
+# to-binary-alpha
+
 default_params["to-binary-alpha"] = {   
     "images":"+@.*",
     "layers":"+@.*",
@@ -115,7 +120,7 @@ param_help["to-binary-alpha"] = {
     "t1":"\nHigh alpha value for pixels with alpha above or equal to the threshold.\n",
 }
 
-    
+# rm-layers
 default_params["rm-layers"] = {
     "images": "+@.*",
     "layers": "~backdrop",
@@ -128,6 +133,27 @@ op_help["rm-layers"] = """
 param_help["rm-layers"] = {
     "images":images_description,
     "layers":layers_description,
+}
+
+# cp-layers
+
+
+default_params["cp-layers"] = {
+    "images": "+@.*",
+    "layers": "~backdrop",
+    "target": "new-image",
+}
+
+op_help["cp-layers"] = """
+    Copies the matching layers from the images in memory and puts them on top
+    of the layers of the image target.
+"""
+
+param_help["cp-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "target":"\nName of the image where the layers shall be copied to. If there\n"+
+             "is no image with the given name, a new one is created.\n"
 }
 
 
@@ -608,6 +634,8 @@ def work(task):
             for k,idx in sorted(set(remove_layers),key=lambda x: (x[0],-x[1])):
                 print(f"    ..dropping layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 data[k] = data[k][:idx] + data[k][idx+1:]
+        elif op == "cp-layers":
+            raise Exception("TODO: implement me :)")
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
         write_ora(o[k],data[k])
