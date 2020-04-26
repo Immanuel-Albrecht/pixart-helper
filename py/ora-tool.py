@@ -26,6 +26,7 @@ oplist = sorted(["to-nearest-palette",
           "to-binary-alpha",
           "rm-layers",
           "cp-layers",
+          "rotate-layers"
           ])
 
 default_params = {}
@@ -140,7 +141,7 @@ param_help["rm-layers"] = {
 
 default_params["cp-layers"] = {
     "images": "+@.*",
-    "layers": "~backdrop",
+    "layers": "!~backdrop",
     "target": "new-image",
 }
 
@@ -156,6 +157,36 @@ param_help["cp-layers"] = {
              "is no image with the given name, a new one is created.\n"
 }
 
+# rotate-layers
+
+default_params["rotate-layers"] = {
+    "images": "+@.*",
+    "layers": "!~backdrop",
+    "angle": 12.5,
+    "center": [],
+    "resize": False,
+    "order": 1,
+    "mode": "constant",
+    "cval": 0.0,
+    "clip": True,
+}
+
+op_help["rotate-layers"] = """
+    Rotates the matching layers in the images in memory.
+"""
+
+param_help["rotate-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "angle":"rotation angle in degrees in counter-clockwise direction",
+    "center":"determines the rotation center",
+    "resize":"boolean, if true, then the layer is extended so that the whole original layer fits in it",
+    "order":"order of the spline interpolation, default is 1; integer in the range 0-5",
+    "mode": "points outside the boundaries of the input are filled according to the given mode; ‘constant’, ‘edge’, ‘symmetric’, ‘reflect’, or ‘wrap’",
+    "cval": "if mode is ‘constant’, then this is the value of the outside pixels",
+    "clip": "boolean, if true, clip the output to the range of values of the input"
+}
+#skimage.transform.rotate(image, angle, resize=False, center=None, order=None, mode='constant', cval=0, clip=True, preserve_range=False)
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "help":
@@ -475,7 +506,14 @@ def transform_input_output_to_dict(x):
         return d
     return {'default':x}
     
-
+def as_boolean(x):
+    if type(x) == bool:
+        return x
+    if type(x) == str:
+        return x in ["y","Y","yes","YES","Yes","True","true","TRUE","ON","on","On"]
+    if x:
+        return True
+    return False
     
 def transform_ops(x):
     if type(x) != list:
@@ -570,12 +608,23 @@ def merge_layers(layers):
     output = np.zeros((h,w,4),dtype=np.float)
     for l in layers:
         h,w = l.shape[:2]
-        opaqueness = output[0:h,0:w,-1].reshape((h,w,1))
+        opaqueness = output[0:h,0:w,-1:]
         see_through_left = 255 - opaqueness
-        output[0:h,0:w,:] = (opaqueness * output[0:h,0:w,:] + see_through_left * l[0:h,0:w,:]) / 255
+        output[0:h,0:w,:-1] = (opaqueness * output[0:h,0:w,:-1] + see_through_left * l[0:h,0:w,:-1]) / 255
+        output[0:h,0:w,-1:] = opaqueness + see_through_left * l[0:h,0:w,-1:] / 255
     return (output + .5).astype(np.uint8)
     
-
+def get_center(x):
+    """ convert x to value for center parameter in transformations """
+    if type(x) == list:
+        if len(x) == 2:
+            return np.array(x, dtype=np.float)
+        else:
+            return None
+    elif type(x) == str:
+        return np.array(x.split(","), dtype=np.float)
+    else:
+        return None
 
 def get_layer_filter_map(filter_exp):
     if type(filter_exp) == type(lambda:0):
@@ -602,6 +651,7 @@ def get_image_layers(data, images, layers):
     return img_layer
 
 def work(task):
+    global data
     data = {}
     i = transform_input_output_to_dict(task["input"])
     o = transform_input_output_to_dict(task["output"])
@@ -635,7 +685,33 @@ def work(task):
                 print(f"    ..dropping layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 data[k] = data[k][:idx] + data[k][idx+1:]
         elif op == "cp-layers":
-            raise Exception("TODO: implement me :)")
+            copied_layers = []
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                copied_layers.append(data[k][idx])
+                print(f"    ..copying layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+            target_img = params["target"]
+            if copied_layers == []:
+                print(f"    ..WARNING: no layer has been copied")
+            if not target_img in data:
+                    data[target_img] = copied_layers
+            else:
+                data[target_img] = copied_layers + data[target_img]
+        elif op == 'rotate-layers':
+            center = get_center(params["center"])
+            resize = as_boolean(params["resize"])
+            angle = float(params["angle"])
+            mode = str(params["mode"])
+            cval = np.array(params["cval"],dtype=np.float)
+            clip = as_boolean(params["clip"])
+            order = int(params["order"])
+            print(center)
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                img = sit.rotate(img, angle, resize=resize, center=center,mode=mode, order=order, clip=clip, cval=cval, preserve_range=True)
+                img = img.astype(np.uint8)
+                data[k][idx] = (lbl, img)
+
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
         write_ora(o[k],data[k])
