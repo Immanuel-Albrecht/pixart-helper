@@ -26,7 +26,8 @@ oplist = sorted(["to-nearest-palette",
           "to-binary-alpha",
           "rm-layers",
           "cp-layers",
-          "rotate-layers"
+          "rotate-layers",
+          "flip-layers",
           ])
 
 default_params = {}
@@ -186,7 +187,24 @@ param_help["rotate-layers"] = {
     "cval": "if mode is ‘constant’, then this is the value of the outside pixels",
     "clip": "boolean, if true, clip the output to the range of values of the input"
 }
-#skimage.transform.rotate(image, angle, resize=False, center=None, order=None, mode='constant', cval=0, clip=True, preserve_range=False)
+
+# flip-layers
+
+default_params["flip-layers"] = {
+    "images": "+@.*",
+    "layers": "!~backdrop",
+    "axis": "horizontal",
+}
+
+op_help["flip-layers"] = """
+    Flips (mirror image) the matching layers in the images in memory.
+"""
+
+param_help["flip-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "axis":"either 'horizontal' or 'vertical'",
+}
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "help":
@@ -704,13 +722,19 @@ def work(task):
             cval = np.array(params["cval"],dtype=np.float)
             clip = as_boolean(params["clip"])
             order = int(params["order"])
-            print(center)
             for k,idx in get_image_layers(data,params["images"],params["layers"]):
                 lbl,img = data[k][idx]
                 print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 img = sit.rotate(img, angle, resize=resize, center=center,mode=mode, order=order, clip=clip, cval=cval, preserve_range=True)
                 img = img.astype(np.uint8)
                 data[k][idx] = (lbl, img)
+        elif op == 'flip-layers':
+            axis = 1 if str(params["axis"]) == "horizontal" else 0
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                    lbl,img = data[k][idx]
+                    print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                    img = np.flip(img, axis=axis)
+                    data[k][idx] = (lbl, img)
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
