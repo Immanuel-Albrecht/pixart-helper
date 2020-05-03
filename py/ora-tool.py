@@ -28,6 +28,7 @@ oplist = sorted(["to-nearest-palette",
           "cp-layers",
           "rotate-layers",
           "flip-layers",
+          "merge-layers",
           ])
 
 default_params = {}
@@ -205,6 +206,26 @@ param_help["flip-layers"] = {
     "layers":layers_description,
     "axis":"either 'horizontal' or 'vertical'",
 }
+
+# merge-layers
+default_params["merge-layers"] = {
+    "images": "+@.*",
+    "layers": "!~backdrop",
+    "name": "merged",
+}
+
+op_help["merge-layers"] = """
+    Merges the matching layers in the images in memory,
+    puts the merged layer on top of the respective image,
+    and removes the source layers.
+"""
+
+param_help["merge-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "name":"name of the new top layer containing the merged image data",
+}
+
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "help":
@@ -735,6 +756,16 @@ def work(task):
                     print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                     img = np.flip(img, axis=axis)
                     data[k][idx] = (lbl, img)
+        elif op == 'merge-layers':
+            layer_name = params["name"]
+            target_img_layers = get_image_layers(data,params["images"],params["layers"])
+            for k in set([img for img,_ in target_img_layers]):
+                layers = [idx for img,idx in target_img_layers if img == k]
+                for idx in layers:
+                    print(f"    ..including layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                merged = merge_layers([data[k][idx][1] for idx in layers])
+            data[k] = [(layer_name, merged)] + [data[k][idx] for idx in range(len(data[k])) if not idx in layers]
+        
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
