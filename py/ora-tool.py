@@ -29,6 +29,7 @@ oplist = sorted(["to-nearest-palette",
           "rotate-layers",
           "flip-layers",
           "merge-layers",
+          "move-layers"
           ])
 
 default_params = {}
@@ -226,12 +227,35 @@ param_help["merge-layers"] = {
     "name":"name of the new top layer containing the merged image data",
 }
 
+# move-layers
+default_params["move-layers"] = {
+    "images": "+@.*",
+    "layers": "!~backdrop",
+    "x": 0,
+    "y": 0,
+}
+
+op_help["move-layers"] = """
+    Moves the matching layers in the images in memory,
+    by either adding rows/cols of transparent pixels,
+    or removing rows/cols of image pixels (negative x/y).
+"""
+
+param_help["move-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "x":"number of new columns to add (positive) or columns to remove (negative) in each layer",
+    "y":"number of new rows to add (positive) or rows to remove (negative) in each layer"
+}
+
+
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "help":
     if len(sys.argv) < 3 or not sys.argv[2] in supported_modes+["ops","op","parameter"]:
-        print(f"Usage: {sys.argv[0]} help MODE")
+        print(f"Usage: {sys.argv[0]} help [MODE|ops]")
         print(f" where MODE may be one of the following:\n\n {', '.join(supported_modes)}")
+        print(f"\nYou may use   {sys.argv[0]} help ops    to get more information on available operations.")
     else:
         mode = sys.argv[2]
         if mode == "ops":
@@ -765,7 +789,26 @@ def work(task):
                     print(f"    ..including layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 merged = merge_layers([data[k][idx][1] for idx in layers])
             data[k] = [(layer_name, merged)] + [data[k][idx] for idx in range(len(data[k])) if not idx in layers]
-        
+        elif op == 'move-layers':
+            x = int(params["x"])
+            y = int(params["y"])
+            target_img_layers = get_image_layers(data,params["images"],params["layers"])
+            for k,idx in target_img_layers:
+                print(f"    ..moving layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                name,img = data[k][idx]
+                if x < 0:
+                    img = img[:,-x:]
+                elif x > 0:
+                    shape0 = list(img.shape)
+                    shape0[1] = x
+                    img = np.concatenate([np.zeros(shape0, dtype=np.uint8), img],axis=1)
+                if y < 0:
+                    img = img[-y:,:]
+                elif y > 0:
+                    shape0 = list(img.shape)
+                    shape0[0] = y
+                    img = np.concatenate([np.zeros(shape0, dtype=np.uint8), img],axis=0)
+                data[k][idx] = (name, img)
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
