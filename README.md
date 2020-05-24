@@ -63,6 +63,7 @@ The following operations are supported:
    flip-layers
    merge-layers
    move-layers
+   resize-layers
    rm-layers
    rotate-layers
    to-binary-alpha
@@ -547,6 +548,135 @@ Parameter y of move-layers
 number of new rows to add (positive) or rows to remove (negative) in each layer
 default: 
      y: 0
+     
+
+```
+
+### resize-layers
+
+```
+> ./ora-tool.py help op resize-layers
+resize-layers
+=============
+
+    Resizes the matching layers in the images in memory,
+    by either adding rows/cols of transparent pixels,
+    or removing rows/cols of image pixels.
+
+Example yaml of call with default parameters:
+
+ora-tool:
+  input:
+    default: /path/to/input.ora
+  ops:
+  - resize-layers:
+      h: keep-size
+      images: +@.*
+      layers: '!~backdrop'
+      w: keep-size
+  output:
+    default: /path/to/output.ora
+
+
+In order to get help on each parameter, use
+   ./ora-tool.py help parameter resize-layers [parameter]
+
+  where [parameter] is one of the following:
+        h
+        images
+        layers
+        w
+
+> ./ora-tool.py help parameter resize-layers h
+
+Parameter h of resize-layers
+============================
+target height in pixels (non-negative), 'keep-size' to leave height untouched.
+default: 
+     h: keep-size
+     
+
+
+> ./ora-tool.py help parameter resize-layers images
+
+Parameter images of resize-layers
+=================================
+
+    You may provide either a single image description string, or a list of 
+    image descriptions strings. If you provide a list, then an image is 
+    selected for processing if it is described by at least one of the given 
+    strings.
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     images: +@.*
+     
+
+
+> ./ora-tool.py help parameter resize-layers layers
+
+Parameter layers of resize-layers
+=================================
+
+    You may either provide a single layer description string, a layer number,
+    or a list of layer descriptions strings and layer numbers. If you provide
+    a list, then a layer is selected for processing if it is described by at 
+    least one of the given strings or numbers.
+
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     layers: '!~backdrop'
+     
+
+
+> ./ora-tool.py help parameter resize-layers w
+
+Parameter w of resize-layers
+============================
+target width in pixels (non-negative), 'keep-size' to leave width untouched.
+default: 
+     w: keep-size
      
 
 ```

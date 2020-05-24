@@ -29,7 +29,8 @@ oplist = sorted(["to-nearest-palette",
           "rotate-layers",
           "flip-layers",
           "merge-layers",
-          "move-layers"
+          "move-layers",
+          "resize-layers"
           ])
 
 default_params = {}
@@ -247,6 +248,28 @@ param_help["move-layers"] = {
     "x":"number of new columns to add (positive) or columns to remove (negative) in each layer",
     "y":"number of new rows to add (positive) or rows to remove (negative) in each layer"
 }
+
+# resize-layers
+default_params["resize-layers"] = {
+    "images": "+@.*",
+    "layers": "!~backdrop",
+    "w": "keep-size",
+    "h": "keep-size",
+}
+
+op_help["resize-layers"] = """
+    Resizes the matching layers in the images in memory,
+    by either adding rows/cols of transparent pixels,
+    or removing rows/cols of image pixels.
+"""
+
+param_help["resize-layers"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "w":"target width in pixels (non-negative), 'keep-size' to leave width untouched.",
+    "h":"target height in pixels (non-negative), 'keep-size' to leave height untouched."
+}
+
 
 
 
@@ -809,6 +832,32 @@ def work(task):
                     shape0[0] = y
                     img = np.concatenate([np.zeros(shape0, dtype=np.uint8), img],axis=0)
                 data[k][idx] = (name, img)
+        elif op == 'resize-layers':
+            if params["w"] == "keep-size":
+                x = None
+            else:
+                x = int(params["w"])
+            if params["h"] == "keep-size":
+                y = None
+            else:
+                y = int(params["h"])
+            target_img_layers = get_image_layers(data,params["images"],params["layers"])
+            for k,idx in target_img_layers:
+                print(f"    ..resizing layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                name,img = data[k][idx]
+                if x is not None:
+                    w = x
+                else:
+                    w = img.shape[1]
+                if y is not None:
+                    h = y
+                else:
+                    h = img.shape[0]
+                img0 = np.zeros((h,w)+img.shape[2:],dtype=np.uint8)
+                x1 = min(w,img.shape[1])
+                y1 = min(h,img.shape[0])
+                img0[0:y1,0:x1] = img[0:y1,0:x1]
+                data[k][idx] = (name, img0)
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
