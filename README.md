@@ -22,6 +22,37 @@ You may use   ./ora-tool.py help MODE   to get more information on each mode.
 
 You may use   ./ora-tool.py help ops    to get more information on available operations.
 ```
+### apply yaml file
+
+```
+> ./ora-tool.py help yaml
+
+Usage: ./ora-tool.py yaml [yaml-paths]
+ where [yaml-paths] may be a sequence of paths to yaml files.
+ If the sequence of paths is empty, then the yaml is read from stdin.
+
+Each yaml document is traversed for dictionaries that have a key named
+'ora-tool'. The contents of these keys are supposed to be maps that
+describe what the tool should do. Each such map should define the following
+three keys: 'input', 'output', and 'ops'.
+
+'input' and 'output' may either be a single string, a map, or a list of
+strings, which determines which OpenRaster files to load the internal named
+images from or store the internal named images to, before and after processing,
+respectively. A map maps the internal image name to the file paths, whereas a
+single string is considered to map the internal name 'default'. A list of
+strings is considered to map the internal names 'default', 'default1',
+'default2', and so on.
+
+The 'ops' key defines which operations shall be carried out on the loaded
+images. It may consist of a single operation or a list of operations, and
+each operation may be either given as a string -- thus using all default
+parameters -- or as a map where the key is the name of the operation which
+maps to a map of parameters that override the operations defaults.
+You may use 
+    ./ora-tool.py help ops 
+in order to obtain a list of supported operations.
+```
 ### available operations
 
 ```
@@ -1096,5 +1127,4 @@ default:
      
 
 ```
-
 

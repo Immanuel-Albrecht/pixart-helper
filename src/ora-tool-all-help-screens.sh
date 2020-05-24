@@ -13,6 +13,14 @@ echo ""
 ./ora-tool.py
 echo "\`\`\`"
 
+echo "### apply yaml file"
+echo ""
+echo "\`\`\`"
+echo "> ./ora-tool.py help yaml"
+echo ""
+./ora-tool.py help yaml
+echo "\`\`\`"
+
 echo "### available operations"
 echo ""
 echo "\`\`\`"
