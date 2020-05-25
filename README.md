@@ -60,6 +60,7 @@ in order to obtain a list of supported operations.
 
 The following operations are supported:
    cp-layers
+   fix-transparent-color
    flip-layers
    merge-layers
    move-layers
@@ -187,6 +188,140 @@ is no image with the given name, a new one is created.
 
 default: 
      target: new-image
+     
+
+```
+
+### fix-transparent-color
+
+```
+> ./ora-tool.py help op fix-transparent-color
+fix-transparent-color
+=====================
+
+    The color channel of transparent pixels is set to the weighted sum of their 
+    neighboring non-transparent pixels, where the weighting occurs with respect
+    to the alpha channel.
+
+Example yaml of call with default parameters:
+
+ora-tool:
+  input:
+    default: /path/to/input.ora
+  ops:
+  - fix-transparent-color:
+      images: +@.*
+      layers: '!~backdrop'
+      neighborhood: 8
+      threshold: 0
+  output:
+    default: /path/to/output.ora
+
+
+In order to get help on each parameter, use
+   ./ora-tool.py help parameter fix-transparent-color [parameter]
+
+  where [parameter] is one of the following:
+        images
+        layers
+        neighborhood
+        threshold
+
+> ./ora-tool.py help parameter fix-transparent-color images
+
+Parameter images of fix-transparent-color
+=========================================
+
+    You may provide either a single image description string, or a list of 
+    image descriptions strings. If you provide a list, then an image is 
+    selected for processing if it is described by at least one of the given 
+    strings.
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     images: +@.*
+     
+
+
+> ./ora-tool.py help parameter fix-transparent-color layers
+
+Parameter layers of fix-transparent-color
+=========================================
+
+    You may either provide a single layer description string, a layer number,
+    or a list of layer descriptions strings and layer numbers. If you provide
+    a list, then a layer is selected for processing if it is described by at 
+    least one of the given strings or numbers.
+
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     layers: '!~backdrop'
+     
+
+
+> ./ora-tool.py help parameter fix-transparent-color neighborhood
+
+Parameter neighborhood of fix-transparent-color
+===============================================
+
+Either 8 for all neighboring cells or 4 for the cross neightbors.
+
+default: 
+     neighborhood: 8
+     
+
+
+> ./ora-tool.py help parameter fix-transparent-color threshold
+
+Parameter threshold of fix-transparent-color
+============================================
+
+Threshold value for the alpha component, below this value,
+a pixel is considered to be transparent.
+
+default: 
+     threshold: 0
      
 
 ```
@@ -1110,7 +1245,7 @@ default:
 Parameter threshold of to-binary-alpha
 ======================================
 
-Threshold value for the alpha compontent.
+Threshold value for the alpha component.
 
 default: 
      threshold: 120

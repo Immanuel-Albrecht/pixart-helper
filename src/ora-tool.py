@@ -30,7 +30,8 @@ oplist = sorted(["to-nearest-palette",
           "flip-layers",
           "merge-layers",
           "move-layers",
-          "resize-layers"
+          "resize-layers",
+          "fix-transparent-color"
           ])
 
 default_params = {}
@@ -120,10 +121,33 @@ op_help["to-binary-alpha"] = """
 param_help["to-binary-alpha"] = {
     "images":images_description,
     "layers":layers_description,
-    "threshold":"\nThreshold value for the alpha compontent.\n",
+    "threshold":"\nThreshold value for the alpha component.\n",
     "t0":"\nLow alpha value for pixels with alpha below the threshold.\n",
     "t1":"\nHigh alpha value for pixels with alpha above or equal to the threshold.\n",
 }
+
+# fix-transparent-color
+
+default_params["fix-transparent-color"] = {   
+    "images":"+@.*",
+    "layers":"!~backdrop",
+    "threshold": 0,
+    "neighborhood": 8,
+    }
+    
+op_help["fix-transparent-color"] = """
+    The color channel of transparent pixels is set to the weighted sum of their 
+    neighboring non-transparent pixels, where the weighting occurs with respect
+    to the alpha channel.
+"""
+
+param_help["fix-transparent-color"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "threshold":"\nThreshold value for the alpha component, below this value,\na pixel is considered to be transparent.\n",
+    "neighborhood":"\nEither 8 for all neighboring cells or 4 for the cross neightbors.\n"
+}
+
 
 # rm-layers
 default_params["rm-layers"] = {
@@ -578,6 +602,36 @@ def to_binary_alpha(img, threshold=120, t0=0,t1=255):
             img0[i][-1] = t0 if img0[i][-1] < threshold else t1
             
     return img0.reshape(shape)
+    
+def fix_transparent_color(img, threshold=0, full_neighborhood=True):
+    shape = img.shape
+    channels = shape[-1]
+    if not (channels == ega_palette.shape[-1] + 1):
+        print(f"WARNING: fix_transparent_color on layer without alpha (shape={img.shape})")
+        return img 
+    
+    mask = np.expand_dims((img[:,:,-1] <= threshold).astype(np.uint8), axis=-1)
+    inv_mask = 1 - mask
+    img0 = (img*inv_mask).astype(np.uint64) # zero out all transparent elements
+    #weight color channels
+    img0[:,:,:-1] *= np.expand_dims(img0[:,:,-1],axis=-1)
+    #now, sum up
+    pixel_sums = np.copy(img0).astype(np.uint64)
+    pixel_sums[1:,:,:] += img0[:-1,:,:] # add values of top row
+    pixel_sums[:-1,:,:] += img0[1:,:,:] # add values of bottom row
+    pixel_sums[:,1:,:] += img0[:,:-1,:] # add values of left column
+    pixel_sums[:,:-1,:] += img0[:,1:,:] # add values of right column
+    if full_neighborhood:
+        pixel_sums[1:,1:,:] += img0[:-1,:-1,:] # add values of top-left
+        pixel_sums[:-1,1:,:] += img0[1:,:-1,:] # add values of bottom-left
+        pixel_sums[1:,:-1,:] += img0[:-1,1:,:] # add values of top-right
+        pixel_sums[:-1,:-1,:] += img0[1:,1:,:] # add values of bottom-right
+    #force the denumerator to be >= 1
+    np.vectorize(lambda x: x if x > 0 else 1)(pixel_sums[:,:,-1])
+    #calculate weighted average
+    pixel_sums = np.round(pixel_sums / (np.expand_dims(pixel_sums[:,:,-1],axis=-1))).astype(np.uint8)
+    pixel_sums[:,:,-1] = 0 # force alpha to be transparent
+    return (img*inv_mask) + (pixel_sums*mask)
 
 def transform_input_output_to_dict(x):
     if type(x) == dict:
@@ -858,6 +912,14 @@ def work(task):
                 y1 = min(h,img.shape[0])
                 img0[0:y1,0:x1] = img[0:y1,0:x1]
                 data[k][idx] = (name, img0)
+        elif op == 'fix-transparent-color':
+            thr = int(params["threshold"])
+            full_neighborhood = str(params["neighborhood"]).strip()=="8"
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                img = fix_transparent_color(img,thr,full_neighborhood)
+                data[k][idx] = (lbl, img)
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")
