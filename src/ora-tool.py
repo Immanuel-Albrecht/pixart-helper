@@ -705,9 +705,9 @@ def rm_tileset_spacing(width,height,border,space, img):
         for x in range(tiles_nX):
             #copy tiles
             x0 = x*width
-            x1 = x*(width + 2*border + space)
+            x1 = x*(width + 2*border + space) + border
             y0 = y*height
-            y1 = y*(height + 2*border + space)
+            y1 = y*(height + 2*border + space) + border
             new_img[y0:y0+height,x0:x0+width] = img[y1:y1+height, x1:x1+width]
             
     return new_img
@@ -726,9 +726,9 @@ def add_tileset_spacing(width,height,border,space, img):
         for x in range(tiles_nX):
             #copy tiles
             x0 = x*width
-            x1 = x*(width + 2*border + space)
+            x1 = x*(width + 2*border + space) + border
             y0 = y*height
-            y1 = y*(height + 2*border + space)
+            y1 = y*(height + 2*border + space) + border
             new_img[y1:y1+height, x1:x1+width] = img[y0:y0+height,x0:x0+width]
             #add borders
             for b in range(border):
