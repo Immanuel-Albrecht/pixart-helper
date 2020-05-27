@@ -4,7 +4,7 @@ import sys
 import os
 import zipfile
 import re
-from skimage import transform as sit
+
 
 # non-standard python modules
 try:
@@ -12,9 +12,10 @@ try:
     from PIL import Image, ImageSequence
     import numpy as np
     import yaml
+    from skimage import transform as sit
 except ModuleNotFoundError:
     print("One or more required packages are missing. Try running:")
-    print("   python3 -m pip install --user xmltodict Pillow numpy pyyaml")
+    print("   python3 -m pip install --user xmltodict Pillow numpy pyyaml scikit-image")
     sys.exit(1)
     
 # We support different modes of programming this tool

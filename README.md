@@ -3,6 +3,38 @@ pixart-helper
 
 Helper tools for creating pixel art animations.
 
+png-to-ora.py and ora-to-png.py
+-------------------------------
+
+These two tools allow you to quickly convert between png and OpenRaster (.ora) files.
+
+```
+> ./ora-to-png.py --help
+
+Usage: ./ora-to-png.py ORA_FILE [PNG_FILE [LAYER_SPEC]] 
+    
+    Converts a png image to a single layer OpenRaster file that is 
+    compatible with ora-tool.py.
+    
+        ORA_FILE    path of the input png file
+        PNG_FILE    optionally: path for the output .ora file. 
+                    Defaults to 'ORA_FILE.png'
+        LAYER_SPEC  optionally: which layers to export? Similar to
+                    ora-tool.py layer specification, defaults to
+                    +@.*
+
+> ./png-to-ora.py --help
+
+Usage: ./png-to-ora.py PNG_FILE [ORA_FILE] 
+    
+    Converts a png image to a single layer OpenRaster file that is 
+    compatible with ora-tool.py.
+    
+        PNG_FILE    path of the input png file
+        ORA_FILE    optionally: path for the output .ora file. 
+                    Defaults to 'PNG_FILE.ora'
+```
+
 
 ora-tool.py
 -----------
@@ -1392,4 +1424,3 @@ default:
      
 
 ```
-

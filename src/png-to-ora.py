@@ -8,7 +8,6 @@ import re
 
 # non-standard python modules
 try:
-    import xmltodict
     from PIL import Image, ImageSequence
     import numpy as np
     from skimage import transform as sit
@@ -34,9 +33,31 @@ out_path = in_path + ".ora"
 if len(sys.argv) > 2:
     out_path = sys.argv[2]
     
+def npa_convert_to_rgba(imga):
+    """
+        single point of conversion for the different pixel formats ...
+        it's a hack, though.
+    """
+    # the following is an odd bid to cope with non RGBA images...
+    if imga.dtype != np.uint8:
+        imga = imga
+        imga = imga / imga.max() #normalizes data in range 0 - 255
+        imga = 255 * imga
+        imga = imga.astype(np.uint8)
+    if len(imga.shape) == 3 and imga.shape[-1] == 1:
+        imga = imga.reshape(imga.shape[:-1])
+    if len(imga.shape) == 2: # greyscale image
+        alpha = np.ones(imga.shape,dtype='uint8')*255
+        imga = np.stack([imga,imga,imga,alpha],axis=-1)
+    elif imga.shape[-1] == 3: # alpha missing
+        alpha = np.ones(imga.shape[:-1]+(1,),dtype='uint8')*255
+        imga = np.concatenate([imga,alpha],axis=-1)
+    return imga
+
+    
 with open(in_path,"rb") as fp:
     img = Image.open(fp)
-    imga = np.asarray(img)
+    imga = npa_convert_to_rgba(np.asarray(img))
 
 h = imga.shape[0]
 w = imga.shape[1]
