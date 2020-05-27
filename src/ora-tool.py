@@ -32,7 +32,9 @@ oplist = sorted(["to-nearest-palette",
           "merge-layers",
           "move-layers",
           "resize-layers",
-          "fix-transparent-color"
+          "fix-transparent-color",
+          "add-tileset-spaces",
+          "rm-tileset-spaces"
           ])
 
 default_params = {}
@@ -147,6 +149,57 @@ param_help["fix-transparent-color"] = {
     "layers":layers_description,
     "threshold":"\nThreshold value for the alpha component, below this value,\na pixel is considered to be transparent.\n",
     "neighborhood":"\nEither 8 for all neighboring cells or 4 for the cross neightbors.\n"
+}
+
+# add-tileset-spaces
+
+default_params["add-tileset-spaces"] = {   
+    "images":"+@.*",
+    "layers":"+@.*",
+    "tile-width": 21,
+    "tile-height": 21,
+    "border-width": 2,
+    "spacing-width": 2,
+    }
+    
+op_help["add-tileset-spaces"] = """
+    Adds borders and spacing between tiles in a tileset image: adds a border
+    of pixels with the color and alpha values of the nearest tile pixel to
+    each tile in the sheet. Between the bordered tiles, an additional spacing
+    with transparent pixels is added.
+"""
+
+param_help["add-tileset-spaces"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "tile-width": "width of a single tile in pixels",
+    "tile-height": "height of a single tile in pixels",
+    "border-width": "thickness of the tile-borders to add",
+    "spacing-width": "thickness of the space strip between tiles to add",
+}
+
+# rm-tileset-spaces
+default_params["rm-tileset-spaces"] = {   
+    "images":"+@.*",
+    "layers":"+@.*",
+    "tile-width": 21,
+    "tile-height": 21,
+    "border-width": 2,
+    "spacing-width": 2,
+    }
+    
+op_help["rm-tileset-spaces"] = """
+    Removes borders and spacing between tiles in a tileset image as
+    a complementary operation to add-tileset-spaces.
+"""
+
+param_help["rm-tileset-spaces"] = {
+    "images":images_description,
+    "layers":layers_description,
+    "tile-width": "width of a single tile in pixels",
+    "tile-height": "height of a single tile in pixels",
+    "border-width": "thickness of the tile-borders to remove",
+    "spacing-width": "thickness of the space strip between tiles to remove",
 }
 
 
@@ -494,6 +547,11 @@ def img_to_np(fp):
     imga = np.asarray(img)
     return npa_convert_to_rgba(imga)
 
+def coerce_to_list(x):
+    if type(x) == list:
+        return x
+    return [x]
+
 def load_ora(path):
     """
         Loads an Open Raster image; as it might have been saved by krita or pinta...
@@ -504,7 +562,7 @@ def load_ora(path):
         if 'stack.xml' not in files:
             return None
         info = xmltodict.parse(f.read('stack.xml'))
-        layer_names_srcs = list(map(lambda x: (x['@name'],x['@src']), info['image']['stack']['layer']))
+        layer_names_srcs = list(map(lambda x: (x['@name'],x['@src']), coerce_to_list(info['image']['stack']['layer'])))
         layers = [ (lbl, img_to_np(f.open(src))) for lbl,src in layer_names_srcs]
     return layers
     
@@ -633,6 +691,71 @@ def fix_transparent_color(img, threshold=0, full_neighborhood=True):
     pixel_sums = np.round(pixel_sums / (np.expand_dims(pixel_sums[:,:,-1],axis=-1))).astype(np.uint8)
     pixel_sums[:,:,-1] = 0 # force alpha to be transparent
     return (img*inv_mask) + (pixel_sums*mask)
+    
+def rm_tileset_spacing(width,height,border,space, img):
+    tiles_nX = int((img.shape[1]+space) / (width+2*border+space))
+    tiles_nY = int((img.shape[0]+space) / (height+2*border+space))
+    if tiles_nX == 0 or tiles_nY == 0:
+        print(f"WARNING: Not even a full tile in image! (shape={img.shape}; tile={width}x{height})")
+        return img
+    new_img = np.zeros((tiles_nY * height,
+                        tiles_nX * width)
+                       + img.shape[2:],dtype=np.uint8)
+    for y in range(tiles_nY):
+        for x in range(tiles_nX):
+            #copy tiles
+            x0 = x*width
+            x1 = x*(width + 2*border + space)
+            y0 = y*height
+            y1 = y*(height + 2*border + space)
+            new_img[y0:y0+height,x0:x0+width] = img[y1:y1+height, x1:x1+width]
+            
+    return new_img
+    
+
+def add_tileset_spacing(width,height,border,space, img):
+    tiles_nX = int(img.shape[1] / width)
+    tiles_nY = int(img.shape[0] / height)
+    if tiles_nX == 0 or tiles_nY == 0:
+        print(f"WARNING: Not even a full tile in image! (shape={img.shape}; tile={width}x{height})")
+        return img
+    new_img = np.zeros((tiles_nY * (height + 2*border + space) - space,
+                        tiles_nX *(width + 2*border + space) - space)
+                       + img.shape[2:],dtype=np.uint8)
+    for y in range(tiles_nY):
+        for x in range(tiles_nX):
+            #copy tiles
+            x0 = x*width
+            x1 = x*(width + 2*border + space)
+            y0 = y*height
+            y1 = y*(height + 2*border + space)
+            new_img[y1:y1+height, x1:x1+width] = img[y0:y0+height,x0:x0+width]
+            #add borders
+            for b in range(border):
+                b += 1
+                #top
+                new_img[y1-b, x1:x1+width] = img[y0,x0:x0+width]
+                #bottom
+                new_img[y1+height+b-1, x1:x1+width] = img[y0+height-1,x0:x0+width]
+                #left
+                new_img[y1:y1+height, x1-b] = img[y0:y0+height,x0]
+                #right
+                new_img[y1:y1+height, x1+width+b-1] = img[y0:y0+height,x0+width-1]
+            if border > 0:
+                xpdim = lambda x: np.expand_dims(np.expand_dims(x,axis=0),axis=0)
+                #corners
+                #top left
+                new_img[y1-border:y1,x1-border:x1] = xpdim(img[y0,x0])
+                #bottom left
+                new_img[y1+height:y1+height+border,x1-border:x1] = xpdim(img[y0+height-1,x0])
+                #top right
+                new_img[y1-border:y1,x1+width:x1+width+border] = xpdim(img[y0,x0+width-1])
+                #bottom right
+                new_img[y1+height:y1+height+border,x1+width:x1+width+border] = xpdim(img[y0+height-1,x0+width-1])
+                    
+            
+    return new_img
+    
 
 def transform_input_output_to_dict(x):
     if type(x) == dict:
@@ -921,6 +1044,27 @@ def work(task):
                 print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
                 img = fix_transparent_color(img,thr,full_neighborhood)
                 data[k][idx] = (lbl, img)
+        elif op == 'add-tileset-spaces':
+            width = int(params["tile-width"])
+            height = int(params["tile-height"])
+            border = max(int(params["border-width"]),0)
+            space = max(int(params["spacing-width"]),0)
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                img = add_tileset_spacing(width,height,border,space, img)
+                data[k][idx] = (lbl, img)
+        elif op == 'rm-tileset-spaces':
+            width = int(params["tile-width"])
+            height = int(params["tile-height"])
+            border = max(int(params["border-width"]),0)
+            space = max(int(params["spacing-width"]),0)
+            for k,idx in get_image_layers(data,params["images"],params["layers"]):
+                lbl,img = data[k][idx]
+                print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
+                img = rm_tileset_spacing(width,height,border,space, img)
+                data[k][idx] = (lbl, img)
+
 
     for k in o:
         print(f"STORE: image '{k}' to '{o[k]}'.")

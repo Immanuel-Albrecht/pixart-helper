@@ -73,6 +73,13 @@ def img_to_np(fp):
     img = Image.open(fp)
     imga = np.asarray(img)
     return npa_convert_to_rgba(imga)
+    
+    
+def coerce_to_list(x):
+    if type(x) == list:
+        return x
+    return [x]
+
 
 def load_ora(path):
     """
@@ -84,7 +91,7 @@ def load_ora(path):
         if 'stack.xml' not in files:
             return None
         info = xmltodict.parse(f.read('stack.xml'))
-        layer_names_srcs = list(map(lambda x: (x['@name'],x['@src']), info['image']['stack']['layer']))
+        layer_names_srcs = list(map(lambda x: (x['@name'],x['@src']), coerce_to_list(info['image']['stack']['layer'])))
         layers = [ (lbl, img_to_np(f.open(src))) for lbl,src in layer_names_srcs]
     return layers
         

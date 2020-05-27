@@ -91,6 +91,7 @@ in order to obtain a list of supported operations.
 > ./ora-tool.py help ops
 
 The following operations are supported:
+   add-tileset-spaces
    cp-layers
    fix-transparent-color
    flip-layers
@@ -98,11 +99,166 @@ The following operations are supported:
    move-layers
    resize-layers
    rm-layers
+   rm-tileset-spaces
    rotate-layers
    to-binary-alpha
    to-nearest-palette
 You may obtain further information on these operations with
    ./ora-tool.py help op [item-from-the-list-above]
+```
+
+### add-tileset-spaces
+
+```
+> ./ora-tool.py help op add-tileset-spaces
+add-tileset-spaces
+==================
+
+    Adds borders and spacing between tiles in a tileset image: adds a border
+    of pixels with the color and alpha values of the nearest tile pixel to
+    each tile in the sheet. Between the bordered tiles, an additional spacing
+    with transparent pixels is added.
+
+Example yaml of call with default parameters:
+
+ora-tool:
+  input:
+    default: /path/to/input.ora
+  ops:
+  - add-tileset-spaces:
+      border-width: 2
+      images: +@.*
+      layers: +@.*
+      spacing-width: 2
+      tile-height: 21
+      tile-width: 21
+  output:
+    default: /path/to/output.ora
+
+
+In order to get help on each parameter, use
+   ./ora-tool.py help parameter add-tileset-spaces [parameter]
+
+  where [parameter] is one of the following:
+        border-width
+        images
+        layers
+        spacing-width
+        tile-height
+        tile-width
+
+> ./ora-tool.py help parameter add-tileset-spaces border-width
+
+Parameter border-width of add-tileset-spaces
+============================================
+thickness of the tile-borders to add
+default: 
+     border-width: 2
+     
+
+
+> ./ora-tool.py help parameter add-tileset-spaces images
+
+Parameter images of add-tileset-spaces
+======================================
+
+    You may provide either a single image description string, or a list of 
+    image descriptions strings. If you provide a list, then an image is 
+    selected for processing if it is described by at least one of the given 
+    strings.
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     images: +@.*
+     
+
+
+> ./ora-tool.py help parameter add-tileset-spaces layers
+
+Parameter layers of add-tileset-spaces
+======================================
+
+    You may either provide a single layer description string, a layer number,
+    or a list of layer descriptions strings and layer numbers. If you provide
+    a list, then a layer is selected for processing if it is described by at 
+    least one of the given strings or numbers.
+
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     layers: +@.*
+     
+
+
+> ./ora-tool.py help parameter add-tileset-spaces spacing-width
+
+Parameter spacing-width of add-tileset-spaces
+=============================================
+thickness of the space strip between tiles to add
+default: 
+     spacing-width: 2
+     
+
+
+> ./ora-tool.py help parameter add-tileset-spaces tile-height
+
+Parameter tile-height of add-tileset-spaces
+===========================================
+height of a single tile in pixels
+default: 
+     tile-height: 21
+     
+
+
+> ./ora-tool.py help parameter add-tileset-spaces tile-width
+
+Parameter tile-width of add-tileset-spaces
+==========================================
+width of a single tile in pixels
+default: 
+     tile-width: 21
+     
+
 ```
 
 ### cp-layers
@@ -947,6 +1103,158 @@ Parameter layers of rm-layers
 
 default: 
      layers: ~backdrop
+     
+
+```
+
+### rm-tileset-spaces
+
+```
+> ./ora-tool.py help op rm-tileset-spaces
+rm-tileset-spaces
+=================
+
+    Removes borders and spacing between tiles in a tileset image as
+    a complementary operation to add-tileset-spaces.
+
+Example yaml of call with default parameters:
+
+ora-tool:
+  input:
+    default: /path/to/input.ora
+  ops:
+  - rm-tileset-spaces:
+      border-width: 2
+      images: +@.*
+      layers: +@.*
+      spacing-width: 2
+      tile-height: 21
+      tile-width: 21
+  output:
+    default: /path/to/output.ora
+
+
+In order to get help on each parameter, use
+   ./ora-tool.py help parameter rm-tileset-spaces [parameter]
+
+  where [parameter] is one of the following:
+        border-width
+        images
+        layers
+        spacing-width
+        tile-height
+        tile-width
+
+> ./ora-tool.py help parameter rm-tileset-spaces border-width
+
+Parameter border-width of rm-tileset-spaces
+===========================================
+thickness of the tile-borders to remove
+default: 
+     border-width: 2
+     
+
+
+> ./ora-tool.py help parameter rm-tileset-spaces images
+
+Parameter images of rm-tileset-spaces
+=====================================
+
+    You may provide either a single image description string, or a list of 
+    image descriptions strings. If you provide a list, then an image is 
+    selected for processing if it is described by at least one of the given 
+    strings.
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     images: +@.*
+     
+
+
+> ./ora-tool.py help parameter rm-tileset-spaces layers
+
+Parameter layers of rm-tileset-spaces
+=====================================
+
+    You may either provide a single layer description string, a layer number,
+    or a list of layer descriptions strings and layer numbers. If you provide
+    a list, then a layer is selected for processing if it is described by at 
+    least one of the given strings or numbers.
+
+    Each filter string may start with up to two option characters, 
+    followed by either a plain match string, or a regular expression 
+    to be parsed by the 're' module in Python 3.
+    
+    1st option character:
+        '+' or not present: reference string has to match the expression
+                            in order to be selected by the filter.
+        '-' or '!':         reference string must fail to match the expression
+                            in order to be selected by the filter.
+                            
+    2nd option character:
+        '@' or not present: the following string is parsed as a regular
+                            expression, the reference string is matched as is.
+        '/':                the following string is parsed as a regular
+                            expression, the reference string is converted to
+                            all lowercase before matching is performed.
+        '=':                the following string is a plain string, the
+                            reference string is taken as is.
+        '~':                the following string is a plain string, the
+                            reference string is converted to all lowercase
+                            before matching.
+
+default: 
+     layers: +@.*
+     
+
+
+> ./ora-tool.py help parameter rm-tileset-spaces spacing-width
+
+Parameter spacing-width of rm-tileset-spaces
+============================================
+thickness of the space strip between tiles to remove
+default: 
+     spacing-width: 2
+     
+
+
+> ./ora-tool.py help parameter rm-tileset-spaces tile-height
+
+Parameter tile-height of rm-tileset-spaces
+==========================================
+height of a single tile in pixels
+default: 
+     tile-height: 21
+     
+
+
+> ./ora-tool.py help parameter rm-tileset-spaces tile-width
+
+Parameter tile-width of rm-tileset-spaces
+=========================================
+width of a single tile in pixels
+default: 
+     tile-width: 21
      
 
 ```
