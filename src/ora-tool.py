@@ -5,6 +5,8 @@ import os
 import zipfile
 import re
 
+import colorsys
+
 
 # non-standard python modules
 try:
@@ -87,6 +89,7 @@ default_params["to-nearest-palette"] = {
     "images":"+@.*",
     "layers":"+@.*",
     "palette":"ega",
+    "colorspace":"rgb",
     "divisor":255
     }
 
@@ -96,13 +99,14 @@ op_help["to-nearest-palette"] = """
     RGB palettes, and considering the alpha value part of the pixels color
     for RGBA palettes. The distance between the original color and each
     palette color is determined by the Euclidean norm of the channel
-    differences divided by the divisor.
+    differences divided by the divisor in the chosen colorspace.
 """
 
 param_help["to-nearest-palette"] = {
     "images":images_description,
     "layers":layers_description,
     "palette":palette_description,
+    "colorspace":"Space where distance is measured, one of: rgb, hls, hsv, yiq.",
     "divisor":"\nThe difference between each original color channel and each\npalette color channel is divided by this value.\n"
 }
 
@@ -513,6 +517,7 @@ ega_palette = np.array([ [int(x[i*2]+x[i*2+1],base=16) for i in range(3)] for x 
                                                     FF55FF
                                                     FFFF55
                                                     FFFFFF""".split("\n"))])
+                                                    
 
 named_palettes = {'ega': ega_palette}
 
@@ -617,7 +622,7 @@ def write_ora(path,layers):
         f.close()
 
     
-def to_nearest_palette(img, palette = ega_palette, divisor=255):
+def to_nearest_palette(img, palette = ega_palette, divisor=255,colorspace="rgb"):
     shape = img.shape
     channels = shape[-1]
     dims = shape[:-1]
@@ -625,16 +630,31 @@ def to_nearest_palette(img, palette = ega_palette, divisor=255):
         has_alpha = True
     else:
         has_alpha = False
+    if colorspace in ["hls","hsv","yiq"]:
+        color_fn0 = {'hls':colorsys.rgb_to_hls,'hsv':colorsys.rgb_to_hsv,'yiq':colorsys.rgb_to_yiq}[colorspace]
+        color_fn = lambda r,g,b: np.array(color_fn0(r/divisor,g/divisor,b/divisor))*divisor
+        new_values = [color_fn(r,g,b) for r,g,b in palette[:,:3]]
+        dist_palette = np.copy(palette).astype(np.float)
+        for idx,x in enumerate(new_values):
+            dist_palette[idx,:3] = x
+    else:
+        color_fn = lambda r,g,b:(r,g,b)
+        dist_palette = palette
     linear = 1
     for x in dims:
         linear *= x
     img0 = np.copy(img.reshape((linear, channels)))
+    if img0.shape[1] >= 3:
+        rgb0 = img0[:,:3]
+        for l in range(rgb0.shape[0]):
+                img0[l,:3] = color_fn(rgb0[l,0],rgb0[l,1],rgb0[l,2])
+                
     for i in range(linear):
         if has_alpha:
             x = img0[i][:-1]
         else:
             x = img0[i]
-        distances = [np.sqrt(np.sum(((x - p)/divisor)**2)) for p in palette]
+        distances = [np.sqrt(np.sum(((x - p)/divisor)**2)) for p in dist_palette]
         d0 = min(distances)
         x = palette[distances.index(d0)]
         if has_alpha:
@@ -929,10 +949,11 @@ def work(task):
             print(f"  {k} = {params[k]}")
         if op == 'to-nearest-palette':
             p = get_palette(params["palette"])
+            space = params["colorspace"]
             for k,idx in get_image_layers(data,params["images"],params["layers"]):
                 lbl,img = data[k][idx]
                 print(f"    ..applying to layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
-                img = to_nearest_palette(img, palette=p,divisor=float(params["divisor"]))
+                img = to_nearest_palette(img, palette=p,divisor=float(params["divisor"]),colorspace=space)
                 data[k][idx] = (lbl, img)
         elif op == 'to-binary-alpha':
             thr = int(params["threshold"])
