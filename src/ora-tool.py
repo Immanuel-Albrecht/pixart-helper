@@ -337,19 +337,34 @@ default_params["resize-layers"] = {
     "layers": "!~backdrop",
     "w": "keep-size",
     "h": "keep-size",
+    "mode":"crop",
+    "interpolation_mode":'constant',
+    "order":1,
+    "cval":0,
+    "clip":True,
+    "anti_aliasing":False,
+    "anti_aliasing_sigma":None
 }
 
 op_help["resize-layers"] = """
     Resizes the matching layers in the images in memory,
     by either adding rows/cols of transparent pixels,
-    or removing rows/cols of image pixels.
+    or removing rows/cols of image pixels (crop mode);
+    or by interpolation (interpolation mode).
 """
 
 param_help["resize-layers"] = {
     "images":images_description,
     "layers":layers_description,
     "w":"target width in pixels (non-negative), 'keep-size' to leave width untouched.",
-    "h":"target height in pixels (non-negative), 'keep-size' to leave height untouched."
+    "h":"target height in pixels (non-negative), 'keep-size' to leave height untouched.",
+    "mode":"either 'crop' or 'interpolation'",
+    "interpolation_mode":"(interpolation mode only) mode how the boundaries of the input are filled;\n one of 'constant', 'edge', 'symmetric', 'reflect', or 'wrap'",
+    "cval":"(interpolation mode only)  with interpolation_mode 'constant',\n the value outside the image boundaries",
+    "clip":"(interpolation mode only) whether to clip the output range of values to that of the input",
+    "anti_aliasing":"(interpolation mode only) flag, apply a Gaussian filter to smooth the image prior to down-scaling?",
+    "anti_aliasing_sigma":"(interpolation mode only) standard deviation for Gaussian filtering, if applied.",
+    "order":"(interpolation mode only) order of the spline interpolation, may be 0-5."
 }
 
 
@@ -1040,6 +1055,13 @@ def work(task):
                 y = None
             else:
                 y = int(params["h"])
+            mode = params["mode"]
+            interpolation_mode = params["interpolation_mode"]
+            anti_aliasing = params["anti_aliasing"]
+            anti_aliasing_sigma = params["anti_aliasing_sigma"]
+            clip = params["clip"]
+            cval = params["cval"]
+            order = params["order"]
             target_img_layers = get_image_layers(data,params["images"],params["layers"])
             for k,idx in target_img_layers:
                 print(f"    ..resizing layer '{k}':{len(data[k])-idx-1} labelled '{data[k][idx][0]}'")
@@ -1055,7 +1077,19 @@ def work(task):
                 img0 = np.zeros((h,w)+img.shape[2:],dtype=np.uint8)
                 x1 = min(w,img.shape[1])
                 y1 = min(h,img.shape[0])
-                img0[0:y1,0:x1] = img[0:y1,0:x1]
+                if mode == "crop":
+                    img0[0:y1,0:x1] = img[0:y1,0:x1]
+                elif mode == "interpolation":
+                    img0 = (sit.resize(img / 255., (h,w)+img.shape[2:], 
+                                        order=order, 
+                                        mode=interpolation_mode,
+                                        cval=cval,
+                                        clip=clip,
+                                        anti_aliasing=anti_aliasing,
+                                        anti_aliasing_sigma=anti_aliasing_sigma)*255).astype(np.uint8)
+                else:
+                    print(f"!!WARNING!! resize mode {mode} is unknown, using 'crop'.")
+                    img0[0:y1,0:x1] = img[0:y1,0:x1]
                 data[k][idx] = (name, img0)
         elif op == 'fix-transparent-color':
             thr = int(params["threshold"])

@@ -884,7 +884,8 @@ resize-layers
 
     Resizes the matching layers in the images in memory,
     by either adding rows/cols of transparent pixels,
-    or removing rows/cols of image pixels.
+    or removing rows/cols of image pixels (crop mode);
+    or by interpolation (interpolation mode).
 
 Example yaml of call with default parameters:
 
@@ -893,9 +894,16 @@ ora-tool:
     default: /path/to/input.ora
   ops:
   - resize-layers:
+      anti_aliasing: false
+      anti_aliasing_sigma: null
+      clip: true
+      cval: 0
       h: keep-size
       images: +@.*
+      interpolation_mode: constant
       layers: '!~backdrop'
+      mode: crop
+      order: 1
       w: keep-size
   output:
     default: /path/to/output.ora
@@ -905,10 +913,58 @@ In order to get help on each parameter, use
    ./ora-tool.py help parameter resize-layers [parameter]
 
   where [parameter] is one of the following:
+        anti_aliasing
+        anti_aliasing_sigma
+        clip
+        cval
         h
         images
+        interpolation_mode
         layers
+        mode
+        order
         w
+
+> ./ora-tool.py help parameter resize-layers anti_aliasing
+
+Parameter anti_aliasing of resize-layers
+========================================
+(interpolation mode only) flag, apply a Gaussian filter to smooth the image prior to down-scaling?
+default: 
+     anti_aliasing: false
+     
+
+
+> ./ora-tool.py help parameter resize-layers anti_aliasing_sigma
+
+Parameter anti_aliasing_sigma of resize-layers
+==============================================
+(interpolation mode only) standard deviation for Gaussian filtering, if applied.
+default: 
+     anti_aliasing_sigma: null
+     
+
+
+> ./ora-tool.py help parameter resize-layers clip
+
+Parameter clip of resize-layers
+===============================
+(interpolation mode only) whether to clip the output range of values to that of the input
+default: 
+     clip: true
+     
+
+
+> ./ora-tool.py help parameter resize-layers cval
+
+Parameter cval of resize-layers
+===============================
+(interpolation mode only)  with interpolation_mode 'constant',
+ the value outside the image boundaries
+default: 
+     cval: 0
+     
+
 
 > ./ora-tool.py help parameter resize-layers h
 
@@ -956,6 +1012,17 @@ default:
      
 
 
+> ./ora-tool.py help parameter resize-layers interpolation_mode
+
+Parameter interpolation_mode of resize-layers
+=============================================
+(interpolation mode only) mode how the boundaries of the input are filled;
+ one of 'constant', 'edge', 'symmetric', 'reflect', or 'wrap'
+default: 
+     interpolation_mode: constant
+     
+
+
 > ./ora-tool.py help parameter resize-layers layers
 
 Parameter layers of resize-layers
@@ -990,6 +1057,26 @@ Parameter layers of resize-layers
 
 default: 
      layers: '!~backdrop'
+     
+
+
+> ./ora-tool.py help parameter resize-layers mode
+
+Parameter mode of resize-layers
+===============================
+either 'crop' or 'interpolation'
+default: 
+     mode: crop
+     
+
+
+> ./ora-tool.py help parameter resize-layers order
+
+Parameter order of resize-layers
+================================
+(interpolation mode only) order of the spline interpolation, may be 0-5.
+default: 
+     order: 1
      
 
 
