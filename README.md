@@ -1605,7 +1605,7 @@ to-nearest-palette
     RGB palettes, and considering the alpha value part of the pixels color
     for RGBA palettes. The distance between the original color and each
     palette color is determined by the Euclidean norm of the channel
-    differences divided by the divisor.
+    differences divided by the divisor in the chosen colorspace.
 
 Example yaml of call with default parameters:
 
@@ -1614,6 +1614,7 @@ ora-tool:
     default: /path/to/input.ora
   ops:
   - to-nearest-palette:
+      colorspace: rgb
       divisor: 255
       images: +@.*
       layers: +@.*
@@ -1626,10 +1627,21 @@ In order to get help on each parameter, use
    ./ora-tool.py help parameter to-nearest-palette [parameter]
 
   where [parameter] is one of the following:
+        colorspace
         divisor
         images
         layers
         palette
+
+> ./ora-tool.py help parameter to-nearest-palette colorspace
+
+Parameter colorspace of to-nearest-palette
+==========================================
+Space where distance is measured, one of: rgb, hls, hsv, yiq.
+default: 
+     colorspace: rgb
+     
+
 
 > ./ora-tool.py help parameter to-nearest-palette divisor
 
